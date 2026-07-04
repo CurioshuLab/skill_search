@@ -2,9 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "npm ci --ignore-scripts",
-  "buildCommand": "npm run web:build",
+  "buildCommand": "npm run db:init && npm run web:build",
   "outputDirectory": "dist",
   "devCommand": "npm run web:dev",
+  "functions": {
+    "api/*.js": {
+      "includeFiles": "data/catalog.sqlite"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

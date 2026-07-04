@@ -8,11 +8,14 @@ const root = resolve(import.meta.dirname, "..");
 export const databasePath = resolve(root, process.env.SKILL_SEARCH_DB_PATH || "data/catalog.sqlite");
 const seedPath = resolve(root, "src/data/ai-skill-packs.json");
 
-export async function readCatalogDataset() {
-  const db = await openCatalogDatabase();
+export async function readCatalogDataset({ readOnly = false } = {}) {
+  const db = await openCatalogDatabase({ readOnly });
   const recordCount = db.prepare("SELECT COUNT(*) AS count FROM skill_records").get().count;
-  if (!recordCount) {
+  if (!recordCount && !readOnly) {
     await seedCatalogDatabase(db);
+  }
+  if (!recordCount && readOnly) {
+    throw new Error("Catalog database is empty");
   }
   return exportDataset(db);
 }
@@ -34,9 +37,13 @@ export async function refreshCatalogDatabase({ mock = false } = {}) {
   return exportDataset(db);
 }
 
-export async function openCatalogDatabase() {
-  mkdirSync(dirname(databasePath), { recursive: true });
-  const db = new DatabaseSync(databasePath);
+export async function openCatalogDatabase({ readOnly = false } = {}) {
+  if (!readOnly) {
+    mkdirSync(dirname(databasePath), { recursive: true });
+  }
+  const db = new DatabaseSync(databasePath, readOnly ? { readOnly: true } : {});
+  if (readOnly) return db;
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS catalog_meta (
       key TEXT PRIMARY KEY,

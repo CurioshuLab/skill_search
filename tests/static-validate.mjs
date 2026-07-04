@@ -13,6 +13,8 @@ const vercel = JSON.parse(await readFile(resolve(root, "vercel.json"), "utf8"));
 const vercelIgnore = await readFile(resolve(root, ".vercelignore"), "utf8");
 const viteConfig = await readFile(resolve(root, "vite.config.mjs"), "utf8");
 const catalogDb = await readFile(resolve(root, "tools/catalog-db.mjs"), "utf8");
+const catalogApi = await readFile(resolve(root, "api/catalog.js"), "utf8");
+const refreshApi = await readFile(resolve(root, "api/refresh.js"), "utf8");
 
 assert.equal(dataset.count, 1000, "dataset count must stay at 1000");
 assert.equal(dataset.records.length, 1000, "dataset records length must stay at 1000");
@@ -71,18 +73,23 @@ assert(html.includes('/src/main.js'), "index.html must keep the Vite module entr
 assert.equal(pkg.scripts.build, "npm run web:build", "package must expose a standard build script for Vercel and local tooling");
 assert.equal(pkg.scripts["db:init"], "node tools/init-catalog-db.mjs", "package must expose DB initialization script");
 assert.equal(pkg.scripts["db:refresh"], "node tools/refresh-catalog-db.mjs", "package must expose DB refresh script");
+assert.equal(pkg.scripts["test:production"], "npm run db:init && node tests/production-db-api.mjs", "production test must validate the SQLite API");
 assert.equal(pkg.private, true, "package must remain private unless publication is explicitly intended");
 assert(!pkg.dependencies || Object.keys(pkg.dependencies).length === 0, "runtime dependencies should remain empty for this static app");
 assert.equal(pkg.devDependencies.playwright, "1.60.0", "Playwright is pinned to verified local browser fallback behavior");
 assert.equal(pkg.devDependencies.vite, "7.3.6", "Vite is pinned for reproducible builds");
 assert(viteConfig.includes("/api/catalog") && viteConfig.includes("/api/refresh"), "Vite config must expose catalog API and refresh API");
 assert(catalogDb.includes("data/catalog.sqlite"), "catalog DB must use local SQLite storage");
+assert(catalogDb.includes("readOnly"), "catalog DB must support read-only production access");
+assert(catalogApi.includes("readCatalogDataset({ readOnly: true })"), "production catalog API must read from SQLite in read-only mode");
+assert(refreshApi.includes("501"), "production refresh API must return an explicit JSON maintenance response");
 
 assert.equal(vercel.framework, "vite", "Vercel framework must be fixed to Vite");
 assert.equal(vercel.installCommand, "npm ci --ignore-scripts", "Vercel install must avoid lifecycle scripts");
-assert.equal(vercel.buildCommand, "npm run web:build", "Vercel build command must match production build");
+assert.equal(vercel.buildCommand, "npm run db:init && npm run web:build", "Vercel build command must initialize the SQLite catalog before production build");
 assert.equal(vercel.outputDirectory, "dist", "Vercel output directory must be dist");
 assert.deepEqual(vercel.rewrites, [{ source: "/(.*)", destination: "/index.html" }], "Vercel SPA rewrite must serve index.html");
+assert.equal(vercel.functions?.["api/*.js"]?.includeFiles, "data/catalog.sqlite", "Vercel function bundle must include the generated SQLite catalog");
 
 const allHeaders = vercel.headers?.flatMap((entry) => entry.headers ?? []) ?? [];
 const headerKeys = new Set(allHeaders.map((header) => header.key));

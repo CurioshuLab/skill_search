@@ -613,7 +613,11 @@ async function loadCatalogDataset() {
   try {
     const response = await fetch("/api/catalog", { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`catalog API ${response.status}`);
-    return response.json();
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error(`catalog API returned ${contentType || "unknown content type"}`);
+    }
+    return await response.json();
   } catch {
     return seedCatalog;
   }
