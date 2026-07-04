@@ -13,11 +13,17 @@
     "test:browser": "node tests/browser-smoke.mjs",
     "test": "npm run test:static && npm run web:build && npm run test:browser",
     "validate": "npm run test",
-    "refresh:data": "node tools/fetch-ai-skill-packs.mjs"
+    "refresh:data": "node tools/fetch-ai-skill-packs.mjs",
+    "build": "npm run web:build",
+    "db:init": "node tools/init-catalog-db.mjs",
+    "db:refresh": "node tools/refresh-catalog-db.mjs"
   },
   "dependencies": {},
   "devDependencies": {
     "playwright": "1.60.0",
     "vite": "7.3.6"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   }
 }

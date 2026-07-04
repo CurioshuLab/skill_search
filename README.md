@@ -57,6 +57,26 @@ vercel deploy --prebuilt --prod
 
 Do not commit `.vercel/project.json` or tokens. Use Vercel project settings or CI secrets for deployment credentials.
 
+
+## Database Operation
+
+The catalog is managed through a local SQLite database at `data/catalog.sqlite`.
+
+```powershell
+npm run db:init
+npm run web:dev -- --port 5173 --strictPort
+```
+
+The app reads records from `/api/catalog` during local Vite development. The `データを更新` button calls `/api/refresh`, fetches the latest GitHub search results, stores them in SQLite, and refreshes the visible catalog.
+
+Use this command for a manual refresh from the terminal:
+
+```powershell
+npm run db:refresh
+```
+
+`GITHUB_TOKEN` or `GH_TOKEN` can be set to raise GitHub API rate limits. The SQLite database file and WAL/SHM sidecar files are local runtime state and are not tracked by Git.
+
 ## Data Refresh
 
 ```powershell
@@ -82,3 +102,4 @@ npm run validate
 - static production validation
 - Vite production build
 - Playwright browser smoke test covering visible controls and mobile layout
+

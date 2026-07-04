@@ -18,6 +18,7 @@ const server = spawn(
   ["node_modules/vite/bin/vite.js", "--host", host, "--port", String(port), "--strictPort"],
   {
     cwd: root,
+    env: { ...process.env, SKILL_SEARCH_REFRESH_MODE: "mock" },
     stdio: "pipe",
     windowsHide: true
   }
@@ -138,7 +139,8 @@ try {
   assert.equal(await page.evaluate(() => document.body.dataset.theme), "light", "light theme button should update body state");
 
   await page.locator("#refreshData").click();
-  assert((await page.getByTestId("mode-panel").innerText()).includes("データ表示を更新しました"), "refresh button should report update status");
+  await page.waitForFunction(() => document.querySelector("[data-testid=mode-panel]")?.textContent?.includes("DBを更新しました"));
+  assert((await page.getByTestId("mode-panel").innerText()).includes("DBを更新しました"), "refresh button should update the database through the API");
 
   await page.locator("#pageSize").selectOption("50");
   assert((await page.locator("#resultCount").innerText()).includes("1 - 50"), "page size should update visible range");
@@ -246,4 +248,8 @@ function canConnect(url) {
       .catch(() => resolveConnect(false));
   });
 }
+
+
+
+
 

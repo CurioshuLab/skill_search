@@ -1,4 +1,4 @@
-import catalogUrl from "./data/ai-skill-packs.json?url";
+import seedCatalog from "./data/ai-skill-packs.json";
 import logoUrl from "./assets/curioshulab-logo-cropped.png";
 import catalogIcon from "./assets/catalog-icons/catalog.png";
 import favoriteIcon from "./assets/catalog-icons/favorite.png";
@@ -22,9 +22,6 @@ import chevronRightIcon from "./assets/catalog-icons/chevron-right.png";
 import externalIcon from "./assets/catalog-icons/external.png";
 import "./styles.css";
 
-const app = document.querySelector("#app");
-app.innerHTML = `<div class="loading-screen" role="status">AI Skill Pack Catalog を読み込んでいます。</div>`;
-const catalog = await loadCatalog();
 const categoryRules = [
   ["開発支援", ["coding", "developer", "dev", "cli", "workflow", "tool", "sdlc"]],
   ["IDE拡張", ["vscode", "cursor", "ide", "editor", "extension"]],
@@ -43,19 +40,8 @@ const agentRules = [
   ["汎用LLM", ["agent", "llm", "chatgpt", "ai"]]
 ];
 
-const records = catalog.records.map((record, index) => {
-  const text = [record.skillName, record.fullName, record.description, record.capability, record.language, record.topics.join(" ")]
-    .join(" ")
-    .toLowerCase();
-  return {
-    ...record,
-    rank: index + 1,
-    category: matchRule(text, categoryRules, "その他"),
-    agent: matchRule(text, agentRules, "汎用LLM"),
-    isOpenSource: record.license && record.license !== "NOASSERTION",
-    selected: false
-  };
-});
+let catalog = await loadCatalogDataset();
+let records = buildRecords(catalog.records);
 
 const state = {
   search: "",
@@ -79,11 +65,12 @@ const state = {
 const favorites = new Set();
 const collection = new Set();
 const compare = new Set();
+const app = document.querySelector("#app");
 
-const categories = unique(records.map((record) => record.category));
-const agents = unique(records.map((record) => record.agent));
-const languages = unique(records.map((record) => record.language).filter(Boolean)).slice(0, 80);
-const licenses = unique(records.map((record) => record.license).filter(Boolean)).slice(0, 50);
+let categories = unique(records.map((record) => record.category));
+let agents = unique(records.map((record) => record.agent));
+let languages = unique(records.map((record) => record.language).filter(Boolean)).slice(0, 80);
+let licenses = unique(records.map((record) => record.license).filter(Boolean)).slice(0, 50);
 
 app.innerHTML = `
   <aside class="sidebar" aria-label="メインナビゲーション">
@@ -121,7 +108,7 @@ app.innerHTML = `
         <p>GitHubから収集したAIスキルパックを検索・比較・活用できるカタログです。</p>
       </div>
       <div class="top-actions">
-        <span class="updated">最終更新: ${formatDateTime(catalog.generatedAt)}</span>
+        <span class="updated" id="updatedAt">最終更新: ${formatDateTime(catalog.generatedAt)}</span>
         <button class="ghost-button" type="button" id="refreshData"><img class="action-icon" src="${refreshIcon}" alt="" aria-hidden="true" />データを更新</button>
         <div class="hero-count">
           <strong>${formatNumber(records.length)}</strong>
@@ -314,17 +301,30 @@ document.querySelector("#closeDetail").addEventListener("click", () => {
   elements.detailCard.classList.toggle("is-collapsed");
 });
 
-elements.refresh.addEventListener("click", () => {
-  state.statusMessage = `データ表示を更新しました: ${formatDateTime(new Date().toISOString())}`;
-  elements.refresh.textContent = "更新済み";
+elements.refresh.addEventListener("click", async () => {
+  elements.refresh.disabled = true;
+  elements.refresh.textContent = "DB更新中";
   elements.refresh.classList.add("is-confirmed");
+  state.statusMessage = "GitHubから取得してDBを更新しています。";
   render();
-  setTimeout(() => {
+
+  try {
+    const response = await fetch("/api/refresh", { method: "POST", headers: { Accept: "application/json" } });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `refresh failed: ${response.status}`);
+    }
+    applyCatalogDataset(payload.dataset);
+    state.statusMessage = `DBを更新しました: ${formatDateTime(payload.dataset.generatedAt)}`;
+  } catch (error) {
+    state.statusMessage = `DB更新に失敗しました: ${String(error.message || error)}`;
+  } finally {
+    elements.refresh.disabled = false;
     elements.refresh.innerHTML = `<img class="action-icon" src="${refreshIcon}" alt="" aria-hidden="true" />データを更新`;
     elements.refresh.classList.remove("is-confirmed");
-  }, 1400);
+    render();
+  }
 });
-
 document.querySelectorAll("[data-nav]").forEach((button) => {
   button.addEventListener("click", () => {
     state.view = button.dataset.nav;
@@ -609,14 +609,74 @@ function optionValueFor(label) {
   return label;
 }
 
-async function loadCatalog() {
-  const response = await fetch(catalogUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to load catalog data: ${response.status}`);
+async function loadCatalogDataset() {
+  try {
+    const response = await fetch("/api/catalog", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`catalog API ${response.status}`);
+    return response.json();
+  } catch {
+    return seedCatalog;
   }
-  return response.json();
 }
 
+function buildRecords(rawRecords) {
+  return rawRecords.map((record, index) => {
+    const text = [record.skillName, record.fullName, record.description, record.capability, record.language, record.topics.join(" ")]
+      .join(" ")
+      .toLowerCase();
+    return {
+      ...record,
+      rank: index + 1,
+      category: matchRule(text, categoryRules, "その他"),
+      agent: matchRule(text, agentRules, "汎用LLM"),
+      isOpenSource: record.license && record.license !== "NOASSERTION",
+      selected: false
+    };
+  });
+}
+
+function applyCatalogDataset(nextCatalog) {
+  catalog = nextCatalog;
+  records = buildRecords(catalog.records);
+  categories = unique(records.map((record) => record.category));
+  agents = unique(records.map((record) => record.agent));
+  languages = unique(records.map((record) => record.language).filter(Boolean)).slice(0, 80);
+  licenses = unique(records.map((record) => record.license).filter(Boolean)).slice(0, 50);
+  Object.assign(state, {
+    search: "",
+    category: "all",
+    agent: "all",
+    scriptFilter: "all",
+    language: "all",
+    license: "all",
+    stars: "all",
+    page: 1,
+    selectedId: records[0]?.id ?? null,
+    view: "catalog"
+  });
+  elements.search.value = "";
+  refreshSelectOptions();
+  setActiveNav("catalog");
+  document.querySelector("#updatedAt").textContent = `最終更新: ${formatDateTime(catalog.generatedAt)}`;
+  document.querySelector(".hero-count strong").textContent = formatNumber(records.length);
+}
+
+function refreshSelectOptions() {
+  replaceOptions(elements.category, categories);
+  replaceOptions(elements.agent, agents);
+  replaceOptions(elements.scriptFilter, ["推定あり", "推定なし"], true);
+  replaceOptions(elements.language, languages);
+  replaceOptions(elements.license, licenses);
+  replaceOptions(elements.stars, ["1万以上", "1000以上", "100以上"], true);
+}
+
+function replaceOptions(select, values, special = false) {
+  const selected = select.value;
+  select.innerHTML = `<option value="all">すべて</option>${values
+    .map((value) => `<option value="${special ? optionValueFor(value) : escapeHtml(value)}">${escapeHtml(value)}</option>`)
+    .join("")}`;
+  select.value = [...select.options].some((option) => option.value === selected) ? selected : "all";
+}
 function unique(values) {
   return [...new Set(values)].sort((a, b) => String(a).localeCompare(String(b), "ja"));
 }
@@ -699,6 +759,9 @@ function escapeHtml(value) {
 }
 
 render();
+
+
+
 
 
 
