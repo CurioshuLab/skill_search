@@ -1,0 +1,23 @@
+{
+  "name": "skill-search",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "start": "vite preview --host 127.0.0.1",
+    "web:dev": "vite --host 127.0.0.1",
+    "web:build": "vite build",
+    "web:preview": "vite preview --host 127.0.0.1",
+    "test:static": "node tests/static-validate.mjs",
+    "test:browser": "node tests/browser-smoke.mjs",
+    "test": "npm run test:static && npm run web:build && npm run test:browser",
+    "validate": "npm run test",
+    "refresh:data": "node tools/fetch-ai-skill-packs.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "playwright": "1.60.0",
+    "vite": "7.3.6"
+  }
+}
