@@ -27,6 +27,14 @@ for (const [index, record] of dataset.records.entries()) {
   assert(typeof record.scriptsIncluded === "boolean", `record ${index} missing scriptsIncluded boolean`);
   assert(record.creator, `record ${index} missing creator`);
   assert(/^https:\/\/github\.com\//.test(record.url), `record ${index} URL must be https://github.com/...`);
+  assert(record.agentCompatibility?.primary, `record ${index} missing agent compatibility`);
+  assert(Array.isArray(record.agentCompatibility?.agents), `record ${index} missing agent compatibility matrix`);
+  assert.equal(record.agentCompatibility.inferred, true, `record ${index} agent fit must be marked inferred`);
+  assert(["ready", "review", "triage"].includes(record.installReadiness?.level), `record ${index} missing readiness level`);
+  assert(["low-review", "needs-review", "high-review"].includes(record.safetySignals?.level), `record ${index} missing safety level`);
+  assert(Array.isArray(record.bundleSignals?.types) && record.bundleSignals.types.length, `record ${index} missing bundle types`);
+  assert(Array.isArray(record.trendSignals?.categories) && record.trendSignals.categories.length, `record ${index} missing trend categories`);
+  assert.equal(record.sourceCompliance?.source, "GitHub REST Search API", `record ${index} must keep official source provenance`);
 }
 
 assert(source.includes("function safeUrl"), "main.js must keep URL allowlist function");
@@ -36,6 +44,12 @@ assert(!/href=\"\$\{record\.url\}\"/.test(source), "record.url must not be writt
 assert(source.includes("/api/catalog"), "main.js must load catalog records from the database API");
 assert(source.includes("/api/refresh"), "main.js must refresh catalog records through the database API");
 assert(source.includes("seedCatalog"), "main.js must keep the static JSON as a fallback seed");
+assert(source.includes("AI Agent Skill Platform"), "main.js must expose the ToA agent platform concept");
+assert(source.includes("Agent Fit"), "main.js must expose agent compatibility workflows");
+assert(source.includes("Source compliance"), "main.js must expose source compliance details");
+assert(source.includes("Last 30 days trend radar"), "main.js must expose recent trend signals");
+assert(source.includes("ローカルDB更新"), "refresh action must be labeled as a local DB update");
+assert(source.includes("本番環境ではメンテナンス用APIとして無効化"), "refresh failure must explain production maintenance mode");
 const unfinishedMarkers = ["TO" + "DO", "未" + "実装"];
 for (const marker of unfinishedMarkers) {
   assert(!source.includes(marker), `main.js must not contain unfinished marker: ${marker}`);
@@ -45,6 +59,7 @@ for (const marker of unfinishedMarkers) {
 
 for (const asset of [
   "curioshulab-logo-cropped.png",
+  "agent-workbench.png",
   "catalog-icons/catalog.png",
   "catalog-icons/favorite.png",
   "catalog-icons/collection.png",
@@ -67,7 +82,7 @@ for (const forbidden of [".expo", ".logs", "automation_outputs", "outputf", "gen
   assert(!rootEntries.has(forbidden), `forbidden migration artifact present: ${forbidden}`);
 }
 
-assert(html.includes('AI Skill Pack Catalog'), "index.html must expose the current catalog shell");
+assert(html.includes('AI Agent Skill Platform'), "index.html must expose the current agent platform shell");
 
 assert(html.includes('/src/main.js'), "index.html must keep the Vite module entry");
 assert.equal(pkg.scripts.build, "npm run web:build", "package must expose a standard build script for Vercel and local tooling");

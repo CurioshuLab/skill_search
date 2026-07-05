@@ -53,7 +53,7 @@ try {
   await page.locator("#filterButton").click();
   assert.equal(await page.locator(".filter-row").evaluate((node) => node.classList.contains("is-focused")), true, "filter button should toggle focused filter state");
 
-  for (const selector of ["#categoryFilter", "#agentFilter", "#languageFilter", "#licenseFilter", "#starsFilter"]) {
+  for (const selector of ["#categoryFilter", "#agentFilter", "#safetyFilter", "#readinessFilter", "#bundleFilter", "#trendFilter", "#licenseFilter", "#starsFilter"]) {
     await selectFirstNonAll(page, selector);
     await page.waitForFunction(() => window.__AI_SKILL_CATALOG__?.visibleCount() >= 0);
     assert.equal(await page.locator(selector).inputValue().then((value) => value !== "all"), true, `${selector} should accept a non-default value`);
@@ -79,6 +79,9 @@ try {
   await page.waitForFunction(() => window.__AI_SKILL_CATALOG__?.visibleCount() > 0);
   const selected = await page.evaluate(() => window.__AI_SKILL_CATALOG__.selected());
   assert.equal(selected.scriptsIncluded, true, "script filter should select likely script records");
+  assert(selected.agentCompatibility?.primary, "selected record should expose agent fit metadata");
+  assert(selected.installReadiness?.recipe, "selected record should expose install readiness");
+  assert(selected.safetySignals?.label, "selected record should expose safety metadata");
 
   await page.locator("button[data-favorite]").first().click();
   assert.equal(await page.evaluate(() => window.__AI_SKILL_CATALOG__.favorites()), 1, "favorite toggle should update state");
@@ -93,6 +96,9 @@ try {
   const selectedAfterActions = await page.evaluate(() => window.__AI_SKILL_CATALOG__.selected());
   assert(detailText.includes(selectedAfterActions.creator), "detail panel should show creator metadata");
   assert(detailText.includes("GitHubで見る"), "detail panel should expose GitHub action");
+  assert(detailText.includes("Agent Fit"), "detail panel should show agent fit");
+  assert(detailText.includes("Install recipe"), "detail panel should show install recipe");
+  assert(detailText.includes("Source compliance"), "detail panel should show source compliance");
 
   await page.locator("button[data-collection]").click();
   assert.equal(await page.evaluate(() => window.__AI_SKILL_CATALOG__.collection()), 1, "collection detail action should update state");
@@ -110,22 +116,20 @@ try {
   await page.locator("button[data-select]").nth(1).click();
   await page.waitForFunction(() => !document.querySelector(".detail-card")?.classList.contains("is-collapsed"));
 
-  await page.locator("button[data-nav='favorites']").click();
-  assert((await page.getByTestId("mode-panel").innerText()).includes("お気に入り"), "favorites view should show status panel");
-  await page.locator("button[data-nav='collection']").click();
-  assert((await page.getByTestId("mode-panel").innerText()).includes("コレクション"), "collection view should show status panel");
+  await page.locator("button[data-nav='agent-fit']").click();
+  assert((await page.getByTestId("mode-panel").innerText()).includes("Agent Fit"), "agent fit view should show status panel");
+  await page.locator("button[data-nav='risk']").click();
+  assert((await page.getByTestId("mode-panel").innerText()).includes("安全性"), "risk view should show status panel");
+  await page.locator("button[data-nav='pipelines']").click();
+  assert((await page.getByTestId("mode-panel").innerText()).includes("prompt"), "pipelines view should show status panel");
+  await page.locator("button[data-nav='signals']").click();
+  assert((await page.getByTestId("mode-panel").innerText()).includes("直近30日"), "signals view should show status panel");
+  await page.locator("[data-trend-chip='MCP tools']").click();
+  assert.equal(await page.locator("#trendFilter").inputValue(), "MCP tools", "trend chip should set trend filter");
+  await page.locator("[data-trend-chip='multimodal assets']").click();
+  assert.equal(await page.locator("#trendFilter").inputValue(), "multimodal assets", "all radar chips should map to trend filter options");
   await page.locator("button[data-nav='compare']").click();
   assert((await page.getByTestId("mode-panel").innerText()).includes("比較"), "compare view should show status panel");
-  await page.locator("button[data-nav='history']").click();
-  assert((await page.getByTestId("mode-panel").innerText()).includes("履歴"), "history view should show status panel");
-
-  await page.locator("button[data-nav='import']").click();
-  const downloadPromise = page.waitForEvent("download");
-  await page.locator("button[data-export-state]").click();
-  const download = await downloadPromise;
-  assert.equal(download.suggestedFilename(), "skill-catalog-state.json", "state export should download a JSON file");
-  await page.locator("button[data-sample-import]").click();
-  assert.equal(await page.evaluate(() => window.__AI_SKILL_CATALOG__.favorites() > 0), true, "import sample should populate saved state");
 
   await page.locator("button[data-nav='settings']").click();
   await page.locator("button[data-density='compact']").click();
@@ -219,7 +223,7 @@ async function findCachedChromium() {
 }
 
 async function expectCatalogReady(page) {
-  await page.getByRole("heading", { name: "AI Skill Pack Catalog" }).waitFor();
+  await page.getByRole("heading", { name: "AI Agent Skill Platform" }).waitFor();
   await page.getByTestId("catalog-rows").waitFor();
   await page.waitForFunction(() => window.__AI_SKILL_CATALOG__?.count() === 1000);
 }

@@ -1,12 +1,14 @@
 # skill_search
 
-AI Skill Pack Catalog is a standalone Vite web app for searching and reviewing a GitHub-derived catalog of AI skill pack candidates.
+AI Agent Skill Platform is a standalone Vite web app for searching and reviewing a GitHub-derived catalog of AI skill pack candidates for AI agents, agent operators, and developers.
 
 ## What Is Included
 
 - 1000 GitHub-derived catalog records in `src/data/ai-skill-packs.json`
 - CurioshuLab logo and generated UI icon assets under `src/assets/`
-- Search, filters, favorites, collection, compare, history, import-state demo, settings, theme, detail panel, pagination, and external GitHub links
+- Agent-facing metadata for compatibility, install readiness, safety review, bundle type, trend signals, and source compliance
+- Search, filters, Agent Fit, Risk, Pipelines, Signals, compare, settings, theme, detail panel, pagination, and external GitHub links
+- A generated bitmap workbench visual at `src/assets/agent-workbench.png`
 - Production checks for static data safety, build health, browser behavior, responsive screenshots, and Vercel deployment settings
 
 ## Local Operation
@@ -69,6 +71,8 @@ npm run web:dev -- --port 5173 --strictPort
 
 The app reads records from `/api/catalog` during local Vite development. The `データを更新` button calls `/api/refresh`, fetches the latest GitHub search results, stores them in SQLite, and refreshes the visible catalog.
 
+`db:init` rebuilds `data/catalog.sqlite` from the checked-in seed JSON so local and production API responses keep the same enriched metadata contract.
+
 Use this command for a manual refresh from the terminal:
 
 ```powershell
@@ -91,6 +95,8 @@ npm run validate
 
 - External app links are restricted in code to `https://github.com/...` and `https://docs.github.com/...`.
 - Links open with `rel="noopener noreferrer"`.
+- Agent compatibility, install readiness, bundle type, trend, and safety values are inferred from public GitHub repository metadata. They are triage hints, not endorsements or security audit results.
+- Verify each repository README, license, scripts, hooks, requested permissions, and third-party terms before installing or executing a skill.
 - Runtime dependencies are intentionally empty; Vite and Playwright are development-only.
 - `node_modules/`, `dist/`, `output/`, and environment files are ignored.
 - Vercel uploads exclude local build/test artifacts through `.vercelignore`.

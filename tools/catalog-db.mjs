@@ -7,11 +7,22 @@ import { createDataset, fetchCatalogDataset } from "./catalog-source.mjs";
 const root = resolve(import.meta.dirname, "..");
 export const databasePath = resolve(root, process.env.SKILL_SEARCH_DB_PATH || "data/catalog.sqlite");
 const seedPath = resolve(root, "src/data/ai-skill-packs.json");
+const insightColumns = [
+  ["agent_compatibility_json", "{}"],
+  ["install_readiness_json", "{}"],
+  ["safety_signals_json", "{}"],
+  ["bundle_signals_json", "{}"],
+  ["trend_signals_json", "{}"],
+  ["source_compliance_json", "{}"]
+];
 
 export async function readCatalogDataset({ readOnly = false } = {}) {
   const db = await openCatalogDatabase({ readOnly });
   const recordCount = db.prepare("SELECT COUNT(*) AS count FROM skill_records").get().count;
   if (!recordCount && !readOnly) {
+    await seedCatalogDatabase(db);
+  }
+  if (recordCount && !readOnly && hasMissingInsights(db)) {
     await seedCatalogDatabase(db);
   }
   if (!recordCount && readOnly) {
@@ -66,7 +77,13 @@ export async function openCatalogDatabase({ readOnly = false } = {}) {
       forks INTEGER NOT NULL,
       updated_at TEXT NOT NULL,
       license TEXT NOT NULL,
-      matched_query TEXT NOT NULL
+      matched_query TEXT NOT NULL,
+      agent_compatibility_json TEXT NOT NULL DEFAULT '{}',
+      install_readiness_json TEXT NOT NULL DEFAULT '{}',
+      safety_signals_json TEXT NOT NULL DEFAULT '{}',
+      bundle_signals_json TEXT NOT NULL DEFAULT '{}',
+      trend_signals_json TEXT NOT NULL DEFAULT '{}',
+      source_compliance_json TEXT NOT NULL DEFAULT '{}'
     );
     CREATE TABLE IF NOT EXISTS source_queries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +97,7 @@ export async function openCatalogDatabase({ readOnly = false } = {}) {
     CREATE INDEX IF NOT EXISTS idx_skill_records_creator ON skill_records(creator);
     CREATE INDEX IF NOT EXISTS idx_skill_records_language ON skill_records(language);
   `);
+  ensureInsightColumns(db);
   return db;
 }
 
@@ -113,8 +131,10 @@ export function replaceCatalogDataset(db, dataset) {
     const insertRecord = db.prepare(`
       INSERT INTO skill_records (
         id, skill_name, full_name, capability, scripts_included, scripts_label, scripts_reason,
-        creator, url, description, language, topics_json, stars, forks, updated_at, license, matched_query
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        creator, url, description, language, topics_json, stars, forks, updated_at, license, matched_query,
+        agent_compatibility_json, install_readiness_json, safety_signals_json, bundle_signals_json,
+        trend_signals_json, source_compliance_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const record of dataset.records ?? []) {
       insertRecord.run(
@@ -134,7 +154,13 @@ export function replaceCatalogDataset(db, dataset) {
         record.forks ?? 0,
         record.updatedAt || "",
         record.license || "NOASSERTION",
-        record.matchedQuery || ""
+        record.matchedQuery || "",
+        stringifyJson(record.agentCompatibility),
+        stringifyJson(record.installReadiness),
+        stringifyJson(record.safetySignals),
+        stringifyJson(record.bundleSignals),
+        stringifyJson(record.trendSignals),
+        stringifyJson(record.sourceCompliance)
       );
     }
 
@@ -147,6 +173,32 @@ export function replaceCatalogDataset(db, dataset) {
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+}
+
+function ensureInsightColumns(db) {
+  const existing = new Set(db.prepare("PRAGMA table_info(skill_records)").all().map((column) => column.name));
+  for (const [name, defaultJson] of insightColumns) {
+    if (!existing.has(name)) {
+      db.exec(`ALTER TABLE skill_records ADD COLUMN ${name} TEXT NOT NULL DEFAULT '${defaultJson}'`);
+    }
+  }
+}
+
+function hasMissingInsights(db) {
+  const row = db.prepare("SELECT agent_compatibility_json, install_readiness_json, safety_signals_json FROM skill_records ORDER BY stars DESC, id ASC LIMIT 1").get();
+  return !row?.agent_compatibility_json || row.agent_compatibility_json === "{}" || !row.install_readiness_json || row.install_readiness_json === "{}" || !row.safety_signals_json || row.safety_signals_json === "{}";
+}
+
+function stringifyJson(value) {
+  return JSON.stringify(value ?? {});
+}
+
+function parseJson(value, fallback) {
+  try {
+    return JSON.parse(value || "");
+  } catch {
+    return fallback;
   }
 }
 
@@ -187,7 +239,13 @@ function fromDbRecord(row) {
     forks: row.forks,
     updatedAt: row.updated_at,
     license: row.license,
-    matchedQuery: row.matched_query
+    matchedQuery: row.matched_query,
+    agentCompatibility: parseJson(row.agent_compatibility_json, {}),
+    installReadiness: parseJson(row.install_readiness_json, {}),
+    safetySignals: parseJson(row.safety_signals_json, {}),
+    bundleSignals: parseJson(row.bundle_signals_json, {}),
+    trendSignals: parseJson(row.trend_signals_json, {}),
+    sourceCompliance: parseJson(row.source_compliance_json, {})
   };
 }
 

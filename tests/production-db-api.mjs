@@ -12,6 +12,13 @@ assert.equal(dataset.storage, "SQLite database", "catalog API should expose SQLi
 assert.equal(dataset.count, 1000, "catalog API should return the full catalog");
 assert.equal(dataset.records.length, 1000, "catalog API should return all records");
 assert(dataset.records[0].skillName, "catalog API should return skill records");
+assert(dataset.records[0].agentCompatibility?.primary, "catalog API should round-trip agent compatibility");
+assert(Array.isArray(dataset.records[0].agentCompatibility?.agents), "catalog API should return compatibility matrix");
+assert(dataset.records[0].installReadiness?.recipe, "catalog API should round-trip install readiness");
+assert(dataset.records[0].safetySignals?.label, "catalog API should round-trip safety signals");
+assert(Array.isArray(dataset.records[0].bundleSignals?.types), "catalog API should round-trip bundle types");
+assert(Array.isArray(dataset.records[0].trendSignals?.categories), "catalog API should round-trip trend categories");
+assert.equal(dataset.records[0].sourceCompliance?.source, "GitHub REST Search API", "catalog API should round-trip source compliance");
 
 const methodResponse = await invoke(catalogHandler, { method: "POST" });
 assert.equal(methodResponse.statusCode, 405, "catalog API should reject unsupported methods");
